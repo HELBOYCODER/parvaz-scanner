@@ -33,7 +33,7 @@ public class MainActivity extends AppCompatActivity {
   AtomicBoolean abort = new AtomicBoolean(false);
   List<WarpScanEngine.Result> okList = Collections.synchronizedList(new ArrayList<>());
   int scanCount = 1000;
-  int cfgPort = 443;
+  int cfgPort = 2408;
   boolean cfgRandomPort = false;
   int cfgThreads = 32;
   int cfgTimeout = 1200;
@@ -73,15 +73,15 @@ public class MainActivity extends AppCompatActivity {
       public void onNothingSelected(AdapterView<?> p){}
     });
 
-    // PORT — senpai style: fixed or random per-IP; default 443 (best for CF/WARP TCP RTT)
-    String[] portOpts = {"443  (CF/WARP)", "80  (HTTP)", "2408  (WG)", "878  (WG)", "تصادفی WG (54 پورت)"};
-    int[] portVals = {443,80,2408,878,-1};
+    // PORT — WARP UDP only (BPB truth: senpai scan is pure UDP Warp, 443 is TCP NOT warp)
+    String[] portOpts = {"2408  (WARP UDP) ← پیش‌فرض", "500  (IPsec/WARP)", "1701  (L2TP/WARP)", "4500  (IPsec NAT)", "تصادفی WG (54 پورت WARP UDP)"};
+    int[] portVals = {2408,500,1701,4500,-1};
     ArrayAdapter<String> aPort = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, portOpts);
     aPort.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
     spPort.setAdapter(aPort);
     spPort.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){
       public void onItemSelected(AdapterView<?> p, View v,int pos,long id){
-        if(portVals[pos]==-1){ cfgRandomPort=true; cfgPort=443; } else { cfgRandomPort=false; cfgPort=portVals[pos]; }
+        if(portVals[pos]==-1){ cfgRandomPort=true; cfgPort=2408; } else { cfgRandomPort=false; cfgPort=portVals[pos]; }
       }
       public void onNothingSelected(AdapterView<?> p){}
     });
@@ -172,7 +172,7 @@ public class MainActivity extends AppCompatActivity {
       pool.execute(()->{
         if(abort.get()) return;
         int port = cfgRandomPort ? WG_PORTS[rnd.nextInt(WG_PORTS.length)] : cfgPort;
-        WarpScanEngine.Result res=WarpScanEngine.checkLatency(ip, port, cfgTimeout);
+        WarpScanEngine.Result res=WarpScanEngine.checkWarp(ip, port, cfgTimeout);
         if(res.isClean && cfgSpeed){
           double kbps=WarpScanEngine.checkDownloadSpeed(ip, 500_000, 5000);
           res.speedKBps=kbps;

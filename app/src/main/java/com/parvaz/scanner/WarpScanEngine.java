@@ -1,15 +1,17 @@
 package com.parvaz.scanner;
-import java.io.InputStream;
+import java.io.*;
 import java.net.*;
-import javax.net.ssl.*;
-import java.util.concurrent.*;
+import java.util.*;
 
-/** WarpScanEngine — senpai ScanEngine ported to Warp.
- *  Tricks ported:
- *   1) TCP latency via Socket.connect (measureTimeMillis)
- *   2) Optional downloadSpeed via Host: speed.cloudflare.com over direct CF IP (Host header + hostnameVerifier bypass)
- *   3) Two-stage pipeline: TCP pass -> speed test (so slow speedtest only on clean IPs)
- *   4) Tight timeout per IP so throughput stays high even on 10k+ batches.
+/**
+ * WarpScanEngine — ported from BPB (bia-pain-bache/BPB-Warp-Scanner) + senpai tricks.
+ *
+ * BPB truth: NO WireGuard handshake needed for scan. scanPort(port,host):
+ *   - UDP ping: send random bytes to host:port, wait any reply -> port open
+ *   - TCP RTT: socket to host:443, measure latency (routing quality)
+ *   - Sort by DetailResult / RTT
+ * Here: UDP reachability = Warp candidate; TCP 443 RTT = quality sort.
+ * Speed test (optional) still via Host: speed.cloudflare.com trick.
  */
 public class WarpScanEngine {
   public static class Result {
@@ -18,27 +20,64 @@ public class WarpScanEngine {
     public String ep(){ return ip+":"+port; }
   }
 
-  /** TCP latency to ip:port (same trick as senpai ScanEngine.checkLatency) */
-  public static Result checkLatency(String ip, int port, int timeoutMs){
-    Socket sock=null;
+  /** BPB-style UDP availability check: any reply on udp port => Warp edge is there */
+  public static boolean udpAvailable(String host, int port, int timeoutMs){
+    DatagramSocket ds=null;
     try{
-      String clean = ip.startsWith("[")? ip.substring(1,ip.length()-1) : ip;
-      InetAddress addr=InetAddress.getByName(clean);
-      sock=new Socket();
-      long t0=System.currentTimeMillis();
-      sock.connect(new InetSocketAddress(addr, port), timeoutMs);
-      long lat = System.currentTimeMillis()-t0;
-      sock.close();
-      return new Result(ip,port,true,lat,0);
+      InetAddress addr=InetAddress.getByName(host);
+      byte[] out=new byte[32]; new Random().nextBytes(out);
+      DatagramPacket p=new DatagramPacket(out, out.length, addr, port);
+      ds=new DatagramSocket();
+      ds.setSoTimeout(timeoutMs);
+      ds.send(p);
+      byte[] in=new byte[512];
+      DatagramPacket resp=new DatagramPacket(in, in.length);
+      ds.receive(resp);
+      return true; // any packet back => port reachable
+    }catch(SocketTimeoutException e){
+      return false;
     }catch(Exception e){
-      if(sock!=null) try{sock.close();}catch(Exception x){}
-      return new Result(ip,port,false,-1,0);
+      return false;
+    }finally{
+      if(ds!=null) try{ ds.close(); }catch(Exception x){}
     }
   }
 
-  /** Optional speed test via Host: speed.cloudflare.com to direct IP (senpai checkDownloadSpeed) */
+  /** TCP RTT to host:port — quality metric (BPB measures 443, we measure the Warp port itself for Warp RTT) */
+  public static long tcpRtt(String host, int port, int timeoutMs){
+    Socket s=null;
+    try{
+      InetAddress addr=InetAddress.getByName(host);
+      s=new Socket();
+      long t0=System.currentTimeMillis();
+      s.connect(new InetSocketAddress(addr, port), timeoutMs);
+      long lat=System.currentTimeMillis()-t0;
+      s.close();
+      return lat;
+    }catch(Exception e){
+      if(s!=null) try{s.close();}catch(Exception x){}
+      return -1;
+    }
+  }
+
+  /** Full Warp check: UDP open on Warp port + TCP RTT (for sorting). Timeout 2s UDP, timeoutMs TCP. */
+  public static Result checkWarp(String ip, int port, int timeoutMs){
+    String host = ip.startsWith("[") ? ip.substring(1, ip.length()-1) : ip;
+    boolean udp = udpAvailable(host, port, 2000);
+    if(!udp) return new Result(ip, port, false, -1, 0);
+    long rtt = tcpRtt(host, port, timeoutMs);
+    // UDP open is already Warp-capable; rtt <0 still counts but sorted last
+    long lat = (rtt<0 ? timeoutMs : rtt);
+    return new Result(ip, port, true, lat, 0);
+  }
+
+  /** Legacy alias — now Warp-aware */
+  public static Result checkLatency(String ip, int port, int timeoutMs){
+    return checkWarp(ip, port, timeoutMs);
+  }
+
   public static double checkDownloadSpeed(String ip, int payloadBytes, int timeoutMs){
-    if(ip.startsWith("[")) return 0; // skip IPv6 for speedtest
+    if(ip.startsWith("[")) return 0;
     HttpURLConnection conn=null; InputStream is=null; double kbps=0;
     try{
       URL url=new URL("https://"+ip+"/__down?bytes="+payloadBytes);
@@ -46,9 +85,8 @@ public class WarpScanEngine {
       conn.setRequestProperty("Host","speed.cloudflare.com");
       conn.setConnectTimeout(timeoutMs);
       conn.setReadTimeout(timeoutMs);
-      if(conn instanceof HttpsURLConnection){
-        ((HttpsURLConnection)conn).setHostnameVerifier((h,s)->true);
-        // default TrustManager is fine (CF cert covers *.cloudflare.com but hostname check is bypassed above)
+      if(conn instanceof javax.net.ssl.HttpsURLConnection){
+        ((javax.net.ssl.HttpsURLConnection)conn).setHostnameVerifier((h,s)->true);
       }
       long t0=System.currentTimeMillis();
       is=conn.getInputStream();
@@ -65,5 +103,18 @@ public class WarpScanEngine {
       if(conn!=null) try{conn.disconnect();}catch(Exception x){}
     }
     return kbps;
+  }
+
+  /** senpai trick: batch scan via UDP Warp — same port per call; speed only on clean */
+  public static List<Result> batchCheck(List<String> ips, int port, int timeoutMs, boolean speed, int speedPayload){
+    List<Result> out=new ArrayList<>(ips.size());
+    for(String ip: ips){
+      Result r=checkWarp(ip, port, timeoutMs);
+      if(r.isClean && speed && !ip.startsWith("[")){
+        r.speedKBps = checkDownloadSpeed(ip, speedPayload, 5000);
+      }
+      out.add(r);
+    }
+    return out;
   }
 }
