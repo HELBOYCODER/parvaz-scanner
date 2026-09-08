@@ -7,47 +7,37 @@ import android.view.*;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.*;
-import java.net.*;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.security.SecureRandom;
 
 public class MainActivity extends AppCompatActivity {
+  // Fallback WG port list (when port=random)
   static final int[] WG_PORTS = {
-    500,854,859,864,878,880,890,891,894,903,
-    908,928,934,939,942,943,945,946,955,968,
-    987,988,1002,1010,1014,1018,1070,1074,1180,1387,
-    1701,1843,2371,2408,2506,3138,3476,3581,3854,4177,
-    4198,4233,4500,5279,5956,7103,7152,7156,7281,7559,8319,8742,8854,8886
+    500,854,859,864,878,880,890,891,894,903,908,928,934,939,942,943,945,946,955,968,
+    987,988,1002,1010,1014,1018,1070,1074,1180,1387,1701,1843,2371,2408,2506,3138,3476,3581,
+    3854,4177,4198,4233,4500,5279,5956,7103,7152,7156,7281,7559,8319,8742,8854,8886
   };
-  static final String[] IPV4_PREFIXES = {
-    "188.114.96.", "188.114.97.", "188.114.98.", "188.114.99.",
-    "162.159.192.", "162.159.193.", "162.159.195.",
-    "8.34.146.", "8.39.214.", "8.39.204.", "8.6.112.",
-    "8.35.211.", "8.39.125.", "8.47.69."
-  };
-  static final String[] IPV6_PREFIXES = { "2606:4700:d0::", "2606:4700:d1::" };
 
-  // UI
   TextView tvLog, tvStat, tvStatCount, tvStatOk, tvStatRtt, tvCount, tvLive;
   View btnScan, btnStop;
-  View btnCopyAll, btnCopyTop5, btnCopyTop, btnCopyCSV, btnShare, btnBot;
-  Spinner spCount;
+  View btnCopyAll, btnCopyTop5, btnCopyTop, btnCopyCSV, btnShare, btnBot, btnCopyVless;
+  Spinner spCount, spPort, spThreads, spTimeout;
+  CheckBox cbSpeed;
+  EditText etCidr;
   ProgressBar prog;
   RecyclerView rv; Adapter ad;
 
   ExecutorService pool;
   AtomicBoolean abort = new AtomicBoolean(false);
-  List<Result> okList = Collections.synchronizedList(new ArrayList<>());
+  List<WarpScanEngine.Result> okList = Collections.synchronizedList(new ArrayList<>());
   int scanCount = 1000;
-
-  static class Result {
-    String ip; int port; long rtt;
-    String ep(){ return ip+":"+port; }
-    Result(String ip,int port,long rtt){ this.ip=ip; this.port=port; this.rtt=rtt; }
-  }
+  int cfgPort = 443;
+  boolean cfgRandomPort = false;
+  int cfgThreads = 32;
+  int cfgTimeout = 1200;
+  boolean cfgSpeed = false;
 
   @Override protected void onCreate(Bundle b){
     super.onCreate(b);
@@ -62,24 +52,65 @@ public class MainActivity extends AppCompatActivity {
     btnCopyAll=findViewById(R.id.btnCopyAll); btnCopyTop5=findViewById(R.id.btnCopyTop5);
     btnCopyTop=findViewById(R.id.btnCopyTop); btnCopyCSV=findViewById(R.id.btnCopyCSV);
     btnShare=findViewById(R.id.btnShare); btnBot=findViewById(R.id.btnBot);
+    btnCopyVless=findViewById(R.id.btnCopyVless);
     spCount=findViewById(R.id.spCount);
+    spPort=findViewById(R.id.spPort);
+    spThreads=findViewById(R.id.spThreads);
+    spTimeout=findViewById(R.id.spTimeout);
+    cbSpeed=findViewById(R.id.cbSpeed);
+    etCidr=findViewById(R.id.etCidr);
     rv=findViewById(R.id.rv); rv.setLayoutManager(new LinearLayoutManager(this));
     ad=new Adapter(okList); rv.setAdapter(ad);
 
-    // spinner: تعداد IP
-    String[] opts = {"1,000  (سریع)", "5,000  (متعادل)", "10,000  (دقیق)", "20,000  (حرفه‌ای)", "50,000  (غول)"};
-    int[] vals = {1000,5000,10000,20000,50000};
-    ArrayAdapter<String> spAd = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, opts);
-    spAd.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-    spCount.setAdapter(spAd);
+    // COUNT
+    String[] countOpts = {"1,000  (سریع)", "5,000  (متعادل)", "10,000  (دقیق)", "20,000  (حرفه‌ای)", "50,000  (غول)"};
+    int[] countVals = {1000,5000,10000,20000,50000};
+    ArrayAdapter<String> aCount = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, countOpts);
+    aCount.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+    spCount.setAdapter(aCount);
     spCount.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){
+      public void onItemSelected(AdapterView<?> p, View v,int pos,long id){ scanCount = countVals[pos]; tvStatCount.setText(String.format("%,d", scanCount)); }
+      public void onNothingSelected(AdapterView<?> p){}
+    });
+
+    // PORT — senpai style: fixed or random per-IP; default 443 (best for CF/WARP TCP RTT)
+    String[] portOpts = {"443  (CF/WARP)", "80  (HTTP)", "2408  (WG)", "878  (WG)", "تصادفی WG (54 پورت)"};
+    int[] portVals = {443,80,2408,878,-1};
+    ArrayAdapter<String> aPort = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, portOpts);
+    aPort.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+    spPort.setAdapter(aPort);
+    spPort.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){
       public void onItemSelected(AdapterView<?> p, View v,int pos,long id){
-        scanCount = vals[pos];
-        tvStatCount.setText(String.format("%,d", scanCount));
-        tvStat.setText("آماده — "+scanCount+" اندپوینت × 54 پورت");
+        if(portVals[pos]==-1){ cfgRandomPort=true; cfgPort=443; } else { cfgRandomPort=false; cfgPort=portVals[pos]; }
       }
       public void onNothingSelected(AdapterView<?> p){}
     });
+
+    // THREADS — senpai: default 16, here default 32 for Warp pool breadth
+    String[] thOpts = {"16", "32 (پیشنهادی)", "64", "96", "128"};
+    int[] thVals = {16,32,64,96,128};
+    ArrayAdapter<String> aTh = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, thOpts);
+    aTh.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+    spThreads.setAdapter(aTh);
+    spThreads.setSelection(1);
+    spThreads.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){
+      public void onItemSelected(AdapterView<?> p, View v,int pos,long id){ cfgThreads = thVals[pos]; }
+      public void onNothingSelected(AdapterView<?> p){}
+    });
+
+    // TIMEOUT
+    String[] toOpts = {"800ms (تند)", "1200ms (متعادل)", "2000ms (صبور)", "3000ms"};
+    int[] toVals = {800,1200,2000,3000};
+    ArrayAdapter<String> aTo = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, toOpts);
+    aTo.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+    spTimeout.setAdapter(aTo);
+    spTimeout.setSelection(1);
+    spTimeout.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener(){
+      public void onItemSelected(AdapterView<?> p, View v,int pos,long id){ cfgTimeout = toVals[pos]; }
+      public void onNothingSelected(AdapterView<?> p){}
+    });
+
+    cbSpeed.setOnCheckedChangeListener((btn, checked)-> cfgSpeed=checked);
 
     btnScan.setOnClickListener(v-> startScan());
     btnStop.setOnClickListener(v->{ abort.set(true); log("[-] توقف درخواست شد"); toast("⏹ متوقف شد"); });
@@ -89,8 +120,8 @@ public class MainActivity extends AppCompatActivity {
     btnCopyCSV.setOnClickListener(v-> copyCSV());
     btnShare.setOnClickListener(v-> shareAll());
     btnBot.setOnClickListener(v-> sendToBot());
+    btnCopyVless.setOnClickListener(v-> copyVless());
 
-    // long-press log to copy/clear
     tvLog.setOnLongClickListener(v->{
       PopupMenu m=new PopupMenu(this, v);
       m.getMenu().add("📋 کپی لاگ").setOnMenuItemClickListener(i->{ copyClip("log", tvLog.getText().toString()); return true; });
@@ -107,94 +138,64 @@ public class MainActivity extends AppCompatActivity {
     toast("📋 کپی شد");
   }
 
-  List<String[]> genEndpoints(int count){
-    List<String[]> out=new ArrayList<>();
-    Set<String> seen=new HashSet<>();
-    SecureRandom sr=new SecureRandom();
-    int v4=count*2/3, v6=count-v4;
-    for(int i=0;i<v4;i++){
-      String pfx=IPV4_PREFIXES[sr.nextInt(IPV4_PREFIXES.length)];
-      String ip=pfx+sr.nextInt(256);
-      int port=WG_PORTS[sr.nextInt(WG_PORTS.length)];
-      String k=ip+":"+port;
-      if(seen.add(k)) out.add(new String[]{ip,String.valueOf(port)});
+  // Build IP list — senpai trick: CIDR sample; WarpCidr pool or custom CIDR, else WARP pool
+  List<String> buildIpList(int count){
+    String custom = etCidr.getText().toString().trim();
+    Random rnd=new Random();
+    if(!custom.isEmpty()){
+      WarpCidr.IpRange r=WarpCidr.parse(custom);
+      if(r==null){ toast("CIDR نامعتبر: "+custom); return new ArrayList<>(); }
+      Set<String> out=new LinkedHashSet<>();
+      while(out.size()<count) out.add(r.random(rnd));
+      return new ArrayList<>(out);
     }
-    for(int i=0;i<v6;i++){
-      String pfx=IPV6_PREFIXES[sr.nextInt(IPV6_PREFIXES.length)];
-      String ip="["+pfx+Integer.toHexString(sr.nextInt(65536))+":"+Integer.toHexString(sr.nextInt(65536))+":"+Integer.toHexString(sr.nextInt(65536))+":"+Integer.toHexString(sr.nextInt(65536))+"]";
-      int port=WG_PORTS[sr.nextInt(WG_PORTS.length)];
-      String k=ip+":"+port;
-      if(seen.add(k)) out.add(new String[]{ip,String.valueOf(port)});
-    }
-    // pad if dedup removed some
-    while(out.size()<count){
-      String pfx=IPV4_PREFIXES[sr.nextInt(IPV4_PREFIXES.length)];
-      String ip=pfx+sr.nextInt(256);
-      int port=WG_PORTS[sr.nextInt(WG_PORTS.length)];
-      String k=ip+":"+port;
-      if(seen.add(k)) out.add(new String[]{ip,String.valueOf(port)});
-    }
-    Collections.shuffle(out, sr);
-    return out;
-  }
-
-  boolean scanUdp(String ip, int port, int timeoutMs){
-    DatagramSocket sock=null;
-    try{
-      String clean = ip.startsWith("[") && ip.endsWith("]") ? ip.substring(1,ip.length()-1) : ip;
-      InetAddress addr=InetAddress.getByName(clean);
-      sock=new DatagramSocket(); sock.setSoTimeout(timeoutMs);
-      byte[] out=new byte[64]; new SecureRandom().nextBytes(out);
-      sock.send(new DatagramPacket(out,out.length,addr,port));
-      byte[] buf=new byte[2048];
-      DatagramPacket in=new DatagramPacket(buf,buf.length);
-      sock.receive(in);
-      sock.close();
-      return in.getLength()>0;
-    }catch(Exception e){ if(sock!=null) try{sock.close();}catch(Exception x){} return false; }
-  }
-
-  long tcpRtt(String ip){
-    String clean = ip.startsWith("[") && ip.endsWith("]") ? ip.substring(1,ip.length()-1) : ip;
-    try{
-      long t0=System.nanoTime();
-      Socket s=new Socket(); s.connect(new InetSocketAddress(clean,443),3000); s.close();
-      return (System.nanoTime()-t0)/1_000_000;
-    }catch(Exception e){ return -1; }
+    return WarpCidr.sampleIps(count, rnd);
   }
 
   void startScan(){
     if(pool!=null) pool.shutdownNow();
+    List<String> ips=buildIpList(scanCount);
+    if(ips.isEmpty()) return;
     abort.set(false); okList.clear(); ad.notifyDataSetChanged();
     tvLog.setText(""); prog.setProgress(0); tvCount.setText("0"); tvStatOk.setText("—");
-    log("[*] === PARVAZ SCAN v1.4 — BPB-matched ===");
-    log("[*] "+scanCount+" endpoints × 54 ports — 14 IPv4 + 2 IPv6 prefixes");
-    List<String[]> eps=genEndpoints(scanCount);
-    log("[*] تولید شد: "+eps.size()+" اندپوینت — شروع اسکن…");
-    tvStat.setText("⏳ در حال اسکن "+eps.size()+" …");
+    String portLabel = cfgRandomPort ? "random WG" : String.valueOf(cfgPort);
+    log("[*] === PARVAZ WARP v1.5 — senpai×WARP ===");
+    log("[*] "+ips.size()+" IPs × port "+portLabel+" | threads="+cfgThreads+" timeout="+cfgTimeout+"ms speed="+(cfgSpeed?"on":"off"));
+    tvStat.setText("⏳ اسکن "+ips.size()+" روی :"+portLabel+" …");
     tvLive.setText("● SCANNING"); tvLive.setTextColor(0xFFEAB308);
-    pool=Executors.newFixedThreadPool(50);
-    final int total=eps.size();
+    pool=Executors.newFixedThreadPool(cfgThreads);
+    final int total=ips.size();
     AtomicInteger done=new AtomicInteger(0), found=new AtomicInteger(0);
     long tStart=System.currentTimeMillis();
-    for(String[] ep: eps){
+    Random rnd=new Random();
+    for(String ip: ips){
       pool.execute(()->{
         if(abort.get()) return;
-        String ip=ep[0]; int port=Integer.parseInt(ep[1]);
-        long t0=System.nanoTime();
-        if(scanUdp(ip,port,2000)){
-          long rtt=tcpRtt(ip);
-          if(rtt<0) rtt=(System.nanoTime()-t0)/1_000_000;
-          Result r=new Result(ip,port,rtt);
-          okList.add(r);
-          synchronized(okList){ Collections.sort(okList,(a,b)-> Long.compare(a.rtt,b.rtt)); }
+        int port = cfgRandomPort ? WG_PORTS[rnd.nextInt(WG_PORTS.length)] : cfgPort;
+        WarpScanEngine.Result res=WarpScanEngine.checkLatency(ip, port, cfgTimeout);
+        if(res.isClean && cfgSpeed){
+          double kbps=WarpScanEngine.checkDownloadSpeed(ip, 500_000, 5000);
+          res.speedKBps=kbps;
+        }
+        if(res.isClean){
+          okList.add(res);
+          // sort: latency asc, then speed desc when speed test is on
+          synchronized(okList){
+            Collections.sort(okList,(a,b)->{
+              int c=Long.compare(a.latencyMs,b.latencyMs);
+              if(c!=0) return c;
+              return Double.compare(b.speedKBps, a.speedKBps);
+            });
+          }
           int f=found.incrementAndGet();
+          WarpScanEngine.Result fr=res;
           runOnUiThread(()->{
             ad.notifyDataSetChanged();
             tvCount.setText(String.valueOf(f));
             tvStatOk.setText(String.valueOf(f));
-            if(f==1) tvStatRtt.setText(r.rtt+"ms بهترین");
-            log("[+] OPEN  "+ip+":"+port+"  "+r.rtt+"ms  (#"+f+")");
+            if(f==1) tvStatRtt.setText(fr.latencyMs+"ms");
+            String extra = cfgSpeed && fr.speedKBps>0 ? String.format("  %.0f KB/s", fr.speedKBps) : "";
+            log("[+] "+fr.ep()+"  "+fr.latencyMs+"ms"+extra+"  (#"+f+")");
           });
         }
         int dn=done.incrementAndGet();
@@ -203,29 +204,23 @@ public class MainActivity extends AppCompatActivity {
         if(dn%200==0 || dn==total) runOnUiThread(()-> tvStat.setText(dn+"/"+total+" — سالم: "+found.get()));
         if(dn==total){
           long sec=(System.currentTimeMillis()-tStart)/1000;
+          // dedup + final sort already done
           runOnUiThread(()->{
             prog.setProgress(100);
             tvLive.setText("● DONE"); tvLive.setTextColor(0xFF22C55E);
             tvStat.setText("✅ تمام — "+found.get()+"/"+total+" سالم در "+sec+"s");
-            if(found.get()>0){ log("[★] بهترین: "+topStr(3)); toast("✅ "+found.get()+" سالم پیدا شد"); }
-            else { log("[-] چیزی پیدا نشد — دوباره تست کن / نت را عوض کن"); }
+            if(found.get()>0){ toast("✅ "+found.get()+" سالم — بهترین اول مرتب شد"); }
+            else { log("[-] چیزی پیدا نشد — پورت/تایم‌اوت/ساب‌نت را عوض کن"); }
           });
         }
       });
     }
   }
 
-  String topStr(int n){
-    StringBuilder sb=new StringBuilder();
-    for(int i=0;i<Math.min(n,okList.size());i++){ if(i>0) sb.append(", "); sb.append(okList.get(i).ep()); }
-    return sb.toString();
-  }
-
-  // ====== کپی حرفه‌ای ======
   void copyAll(){
     if(okList.isEmpty()){ toast("نتیجه‌ای نیست"); return; }
     StringBuilder sb=new StringBuilder();
-    for(Result r: okList) sb.append(r.ep()).append("\n");
+    for(WarpScanEngine.Result r: okList) sb.append(r.ep()).append("\n");
     copyClip("all", sb.toString().trim());
     toast("📋 "+okList.size()+" کپی شد");
   }
@@ -239,15 +234,29 @@ public class MainActivity extends AppCompatActivity {
   }
   void copyCSV(){
     if(okList.isEmpty()){ toast("نتیجه‌ای نیست"); return; }
-    StringBuilder sb=new StringBuilder("ip,port,rtt_ms\n");
-    for(Result r: okList) sb.append(r.ip.replace("[","").replace("]","")).append(",").append(r.port).append(",").append(r.rtt).append("\n");
+    StringBuilder sb=new StringBuilder("ip,port,latency_ms,speed_kbps\n");
+    for(WarpScanEngine.Result r: okList) sb.append(r.ip).append(",").append(r.port).append(",").append(r.latencyMs).append(",").append(String.format("%.0f", r.speedKBps)).append("\n");
     copyClip("csv", sb.toString().trim());
     toast("📄 CSV کپی شد ("+okList.size()+" ردیف)");
   }
+  void copyVless(){
+    if(okList.isEmpty()){ toast("نتیجه‌ای نیست"); return; }
+    // sample VLESS template — user can paste endpoint as address
+    StringBuilder sb=new StringBuilder();
+    for(WarpScanEngine.Result r: okList){
+      sb.append("vless://uuid@").append(r.ip).append(":").append(r.port).append("?encryption=none&security=none&type=tcp#Parvaz-").append(r.latencyMs).append("ms\n");
+    }
+    copyClip("vless", sb.toString().trim());
+    toast("🔗 VLESS کپی شد");
+  }
   void shareAll(){
     if(okList.isEmpty()){ toast("نتیجه‌ای نیست"); return; }
-    StringBuilder sb=new StringBuilder("Parvaz Scanner — "+okList.size()+" سالم (بهترین اول):\n");
-    for(Result r: okList) sb.append(r.ep()).append("  ").append(r.rtt).append("ms\n");
+    StringBuilder sb=new StringBuilder("Parvaz WARP — "+okList.size()+" سالم (بهترین اول):\n");
+    for(WarpScanEngine.Result r: okList){
+      sb.append(r.ep()).append("  ").append(r.latencyMs).append("ms");
+      if(cfgSpeed && r.speedKBps>0) sb.append("  ").append(String.format("%.0f KB/s", r.speedKBps));
+      sb.append("\n");
+    }
     Intent it=new Intent(Intent.ACTION_SEND); it.setType("text/plain"); it.putExtra(Intent.EXTRA_TEXT, sb.toString());
     startActivity(Intent.createChooser(it, "اشتراک نتایج"));
   }
@@ -259,9 +268,8 @@ public class MainActivity extends AppCompatActivity {
     catch(Exception e){ toast(e.getMessage()); }
   }
 
-  // ====== Adapter پرمیوم ======
   static class Adapter extends RecyclerView.Adapter<Adapter.VH>{
-    List<Result> list; Adapter(List<Result> l){ list=l; }
+    List<WarpScanEngine.Result> list; Adapter(List<WarpScanEngine.Result> l){ list=l; }
     static class VH extends RecyclerView.ViewHolder{
       TextView tvRank, tvEp, tvRtt, tvBadge; View btnCopy, btnShare;
       VH(View v){ super(v);
@@ -276,50 +284,41 @@ public class MainActivity extends AppCompatActivity {
       card.setBackgroundResource(R.drawable.bg_card);
       LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
       lp.setMargins(0,6,0,0); card.setLayoutParams(lp);
-
       TextView rank=new TextView(c); rank.setId(1001); rank.setTextColor(0xFF5B6B8A); rank.setTextSize(11); rank.setTypeface(android.graphics.Typeface.MONOSPACE);
       rank.setLayoutParams(new LinearLayout.LayoutParams(36, LinearLayout.LayoutParams.WRAP_CONTENT));
-
       LinearLayout mid=new LinearLayout(c); mid.setOrientation(LinearLayout.VERTICAL);
       mid.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT,1));
       TextView ep=new TextView(c); ep.setId(1002); ep.setTextColor(0xFFE6EEFC); ep.setTextSize(12); ep.setTypeface(android.graphics.Typeface.MONOSPACE);
       TextView rtt=new TextView(c); rtt.setId(1003); rtt.setTextColor(0xFF8AA0C8); rtt.setTextSize(10);
       mid.addView(ep); mid.addView(rtt);
-
       TextView badge=new TextView(c); badge.setId(1004); badge.setTextSize(10); badge.setTextColor(0xFF22C55E);
       badge.setBackgroundResource(R.drawable.bg_chip); badge.setPadding(8,4,8,4);
       badge.setVisibility(View.GONE);
-
       TextView bCopy=new TextView(c); bCopy.setId(1005); bCopy.setText("📋"); bCopy.setTextSize(14);
       bCopy.setGravity(Gravity.CENTER); bCopy.setPadding(10,6,10,6); bCopy.setBackgroundResource(R.drawable.bg_chip);
       TextView bShare=new TextView(c); bShare.setId(1006); bShare.setText("↗"); bShare.setTextSize(14);
       bShare.setGravity(Gravity.CENTER); bShare.setPadding(10,6,10,6); bShare.setBackgroundResource(R.drawable.bg_chip);
       LinearLayout.LayoutParams bp=new LinearLayout.LayoutParams(44,44); bp.setMargins(6,0,0,0);
       bCopy.setLayoutParams(bp); bShare.setLayoutParams(bp);
-
       card.addView(rank); card.addView(mid); card.addView(badge); card.addView(bCopy); card.addView(bShare);
       return new VH(card);
     }
     @Override public void onBindViewHolder(VH h,int pos){
-      Result r=list.get(pos);
+      WarpScanEngine.Result r=list.get(pos);
       h.tvRank.setText("#"+(pos+1));
       h.tvEp.setText(r.ep());
-      String speed = r.rtt<80?"⚡ ":""; 
-      h.tvRtt.setText(speed + r.rtt+"ms  •  :"+r.port);
-      if(pos==0){ h.tvBadge.setVisibility(View.VISIBLE); h.tvBadge.setText("👑 BEST"); h.tvBadge.setTextColor(0xFF070B1E);
-        h.tvBadge.setBackgroundResource(R.drawable.btn_primary); }
+      String extra = r.speedKBps>0 ? String.format("  %.0f KB/s", r.speedKBps) : "";
+      h.tvRtt.setText(r.latencyMs+"ms"+extra+"  •  :"+r.port);
+      if(pos==0){ h.tvBadge.setVisibility(View.VISIBLE); h.tvBadge.setText("👑 BEST"); h.tvBadge.setTextColor(0xFF070B1E); h.tvBadge.setBackgroundResource(R.drawable.btn_primary); }
       else if(pos<3){ h.tvBadge.setVisibility(View.VISIBLE); h.tvBadge.setText("★ TOP"); h.tvBadge.setTextColor(0xFFEAB308); h.tvBadge.setBackgroundResource(R.drawable.bg_chip); }
       else h.tvBadge.setVisibility(View.GONE);
-
       h.btnCopy.setOnClickListener(v->{
         ClipboardManager cm=(ClipboardManager)v.getContext().getSystemService(Context.CLIPBOARD_SERVICE);
         cm.setPrimaryClip(ClipData.newPlainText("ep", r.ep()));
         Toast.makeText(v.getContext(),"📋 "+r.ep(),Toast.LENGTH_SHORT).show();
       });
       h.btnShare.setOnClickListener(v->{
-        ClipboardManager cm=(ClipboardManager)v.getContext().getSystemService(Context.CLIPBOARD_SERVICE);
-        cm.setPrimaryClip(ClipData.newPlainText("ep", r.ep()));
-        Intent it=new Intent(Intent.ACTION_SEND); it.setType("text/plain"); it.putExtra(Intent.EXTRA_TEXT, r.ep()+"  "+r.rtt+"ms");
+        Intent it=new Intent(Intent.ACTION_SEND); it.setType("text/plain"); it.putExtra(Intent.EXTRA_TEXT, r.ep()+"  "+r.latencyMs+"ms");
         v.getContext().startActivity(Intent.createChooser(it, r.ep()));
       });
       h.itemView.setOnLongClickListener(v->{
@@ -329,13 +328,15 @@ public class MainActivity extends AppCompatActivity {
           cm.setPrimaryClip(ClipData.newPlainText("ep", r.ep()));
           Toast.makeText(v.getContext(),"کپی شد: "+r.ep(),Toast.LENGTH_SHORT).show(); return true;
         });
+        m.getMenu().add("🔗 VLESS").setOnMenuItemClickListener(i->{
+          String vless="vless://uuid@"+r.ip+":"+r.port+"?encryption=none&security=none&type=tcp#Parvaz-"+r.latencyMs+"ms";
+          ClipboardManager cm=(ClipboardManager)v.getContext().getSystemService(Context.CLIPBOARD_SERVICE);
+          cm.setPrimaryClip(ClipData.newPlainText("vless", vless));
+          Toast.makeText(v.getContext(),"VLESS کپی شد",Toast.LENGTH_SHORT).show(); return true;
+        });
         m.getMenu().add("↗ اشتراک").setOnMenuItemClickListener(i->{
           Intent it=new Intent(Intent.ACTION_SEND); it.setType("text/plain"); it.putExtra(Intent.EXTRA_TEXT, r.ep());
           v.getContext().startActivity(Intent.createChooser(it, r.ep())); return true;
-        });
-        m.getMenu().add("🤖 ارسال به ربات").setOnMenuItemClickListener(i->{
-          try{ v.getContext().startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/parvazpanelbot?start="+Uri.encode(r.ep())))); }catch(Exception e){}
-          return true;
         });
         m.show(); return true;
       });

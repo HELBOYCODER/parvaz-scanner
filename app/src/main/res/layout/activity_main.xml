@@ -1,4 +1,4 @@
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
   android:layout_width="match_parent" android:layout_height="match_parent" android:background="@color/bg" android:fillViewport="true">
 <LinearLayout android:orientation="vertical" android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="16dp">
 
@@ -6,8 +6,8 @@
   <LinearLayout android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content" android:gravity="center_vertical">
     <TextView android:text="✈️" android:textSize="22sp" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
     <LinearLayout android:orientation="vertical" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:layout_marginStart="10dp">
-      <TextView android:text="پرواز — اسکنر پورت سالم" android:textColor="@color/text1" android:textSize="17sp" android:textStyle="bold" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
-      <TextView android:text="همان موتور hunting خود FCAE — روی نت خودت اجرا می‌شود" android:textColor="@color/text2" android:textSize="11sp" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+      <TextView android:text="پرواز — اسکنر WARP" android:textColor="@color/text1" android:textSize="17sp" android:textStyle="bold" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+      <TextView android:text="CIDR واقعی CF + تست چندگانه + سنجش سرعت" android:textColor="@color/text2" android:textSize="11sp" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
     </LinearLayout>
     <TextView android:id="@+id/tvLive" android:text="● LIVE" android:textColor="@color/success" android:textSize="11sp" android:textStyle="bold" android:background="@drawable/bg_chip" android:paddingLeft="10dp" android:paddingRight="10dp" android:paddingTop="5dp" android:paddingBottom="5dp" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
   </LinearLayout>
@@ -15,9 +15,9 @@
   <!-- STATS ROW -->
   <LinearLayout android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="14dp">
     <LinearLayout android:orientation="vertical" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:background="@drawable/bg_card" android:padding="12dp" android:layout_marginEnd="6dp">
-      <TextView android:text="تعداد IP" android:textColor="@color/text3" android:textSize="10sp" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+      <TextView android:text="هدف اسکن" android:textColor="@color/text3" android:textSize="10sp" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
       <TextView android:id="@+id/tvStatCount" android:text="1,000" android:textColor="@color/text1" android:textSize="18sp" android:textStyle="bold" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
-      <TextView android:text="54 پورت × 16 ساب‌نت" android:textColor="@color/text3" android:textSize="10sp" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+      <TextView android:text="WARP pool × پورت" android:textColor="@color/text3" android:textSize="10sp" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
     </LinearLayout>
     <LinearLayout android:orientation="vertical" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:background="@drawable/bg_card" android:padding="12dp" android:layout_marginStart="6dp">
       <TextView android:text="سالم" android:textColor="@color/text3" android:textSize="10sp" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
@@ -36,11 +36,28 @@
   <ProgressBar android:id="@+id/prog" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="6dp" android:layout_marginTop="10dp" android:max="100" android:progress="0" android:progressTint="@color/primary" android:progressBackgroundTint="@color/surface2"/>
   <TextView android:id="@+id/tvStat" android:text="آماده — دکمه شروع را بزن" android:textColor="@color/text2" android:textSize="11sp" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="6dp"/>
 
-  <!-- COUNT SELECTOR -->
-  <LinearLayout android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:gravity="center_vertical">
-    <TextView android:text="تعداد تست" android:textColor="@color/text2" android:textSize="12sp" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
-    <Spinner android:id="@+id/spCount" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:layout_marginStart="10dp" android:background="@drawable/bg_chip"/>
-    <TextView android:text="IPv6 هم تست می‌شود" android:textColor="@color/text3" android:textSize="10sp" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="8dp"/>
+  <!-- SETTINGS — senpai style: count + port + threads + timeout + speed -->
+  <LinearLayout android:orientation="vertical" android:layout_width="match_parent" android:layout_height="wrap_content" android:background="@drawable/bg_card" android:padding="12dp" android:layout_marginTop="10dp">
+    <TextView android:text="⚙ تنظیمات اسکن  (ترفند Senpai)" android:textColor="@color/text1" android:textSize="11sp" android:textStyle="bold" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+    <LinearLayout android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:gravity="center_vertical">
+      <TextView android:text="تعداد" android:textColor="@color/text2" android:textSize="11sp" android:layout_width="60dp" android:layout_height="wrap_content"/>
+      <Spinner android:id="@+id/spCount" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:background="@drawable/bg_chip"/>
+    </LinearLayout>
+    <LinearLayout android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center_vertical">
+      <TextView android:text="پورت:" android:textColor="@color/text2" android:textSize="11sp" android:layout_width="60dp" android:layout_height="wrap_content"/>
+      <Spinner android:id="@+id/spPort" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:background="@drawable/bg_chip"/>
+      <TextView android:text="ترِد:" android:textColor="@color/text2" android:textSize="11sp" android:layout_width="44dp" android:layout_height="wrap_content" android:layout_marginStart="8dp"/>
+      <Spinner android:id="@+id/spThreads" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:background="@drawable/bg_chip"/>
+    </LinearLayout>
+    <LinearLayout android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center_vertical">
+      <TextView android:text="تایم‌اوت" android:textColor="@color/text2" android:textSize="11sp" android:layout_width="60dp" android:layout_height="wrap_content"/>
+      <Spinner android:id="@+id/spTimeout" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:background="@drawable/bg_chip"/>
+      <CheckBox android:id="@+id/cbSpeed" android:text="تست سرعت" android:textColor="@color/text2" android:textSize="11sp" android:checked="false" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="8dp"/>
+    </LinearLayout>
+    <LinearLayout android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:gravity="center_vertical">
+      <TextView android:text="CIDR سفارشی (اختیاری):" android:textColor="@color/text3" android:textSize="10sp" android:layout_width="wrap_content" android:layout_height="wrap_content"/>
+    </LinearLayout>
+    <EditText android:id="@+id/etCidr" android:hint="مثلا 188.114.98.0/24 یا خالی = WARP pool" android:textColorHint="@color/text3" android:textColor="@color/text1" android:textSize="11sp" android:background="@drawable/bg_chip" android:padding="8dp" android:singleLine="true" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="4dp"/>
   </LinearLayout>
 
   <!-- COPY BAR — حرفه‌ای -->
@@ -51,9 +68,10 @@
     <TextView android:id="@+id/btnCopyTop" android:text="👑 کپی بهترین" android:textColor="#070B1E" android:textSize="11sp" android:textStyle="bold" android:gravity="center" android:background="@drawable/btn_primary" android:paddingTop="9dp" android:paddingBottom="9dp" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:layout_marginStart="6dp"/>
   </LinearLayout>
   <LinearLayout android:orientation="horizontal" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp">
-    <TextView android:id="@+id/btnCopyCSV" android:text="📄 کپی CSV" android:textColor="@color/text2" android:textSize="11sp" android:gravity="center" android:background="@drawable/bg_chip" android:paddingTop="8dp" android:paddingBottom="8dp" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"/>
+    <TextView android:id="@+id/btnCopyCSV" android:text="📄 CSV" android:textColor="@color/text2" android:textSize="11sp" android:gravity="center" android:background="@drawable/bg_chip" android:paddingTop="8dp" android:paddingBottom="8dp" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"/>
     <TextView android:id="@+id/btnShare" android:text="↗ اشتراک" android:textColor="@color/text2" android:textSize="11sp" android:gravity="center" android:background="@drawable/bg_chip" android:paddingTop="8dp" android:paddingBottom="8dp" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:layout_marginStart="6dp"/>
     <TextView android:id="@+id/btnBot" android:text="🤖 ربات" android:textColor="@color/text2" android:textSize="11sp" android:gravity="center" android:background="@drawable/bg_chip" android:paddingTop="8dp" android:paddingBottom="8dp" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:layout_marginStart="6dp"/>
+    <TextView android:id="@+id/btnCopyVless" android:text="🔗 VLESS" android:textColor="@color/text2" android:textSize="11sp" android:gravity="center" android:background="@drawable/bg_chip" android:paddingTop="8dp" android:paddingBottom="8dp" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:layout_marginStart="6dp"/>
   </LinearLayout>
 
   <!-- RESULTS HEADER -->
@@ -68,7 +86,7 @@
   <!-- LOG -->
   <TextView android:text="لاگ" android:textColor="@color/text2" android:textSize="11sp" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="12dp"/>
   <ScrollView android:layout_width="match_parent" android:layout_height="120dp" android:layout_marginTop="4dp" android:background="@drawable/bg_log">
-    <TextView android:id="@+id/tvLog" android:text="I [*] parvaz scanner ready — BPB-matched (14+2 prefixes × 54 ports)" android:textColor="#6B7AA0" android:fontFamily="monospace" android:textSize="10sp" android:padding="10dp" android:layout_width="match_parent" android:layout_height="wrap_content"/>
+    <TextView android:id="@+id/tvLog" android:text="I [*] parvaz scanner — WARP senpai engine ready" android:textColor="#6B7AA0" android:fontFamily="monospace" android:textSize="10sp" android:padding="10dp" android:layout_width="match_parent" android:layout_height="wrap_content"/>
   </ScrollView>
 
 </LinearLayout>

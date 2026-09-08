@@ -4,7 +4,7 @@ android {
   compileSdk = 34
   defaultConfig {
     applicationId = "com.parvaz.scanner"
-    minSdk = 24; targetSdk = 34; versionCode = 3; versionName = "1.3.0"
+    minSdk = 24; targetSdk = 34; versionCode = 5; versionName = "1.5.0"
   }
   buildTypes { release { isMinifyEnabled = false } }
   compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
