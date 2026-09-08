@@ -126,7 +126,7 @@ public class MainActivity extends AppCompatActivity {
     try{ org.bouncycastle.crypto.macs.HMac m=new org.bouncycastle.crypto.macs.HMac(new org.bouncycastle.crypto.digests.Blake2sDigest(32)); m.init(new KeyParameter(key)); m.update(d1,0,d1.length); m.update(d2,0,d2.length); byte[] o=new byte[32]; m.doFinal(o,0); return o; }catch(Exception e){ throw new RuntimeException(e); }
   }
   static byte[] b2sKeyedMac16(byte[] key, byte[] data){
-    try{ org.bouncycastle.crypto.macs.Blake2sMac m=new org.bouncycastle.crypto.macs.Blake2sMac(16, key); m.update(data,0,data.length); byte[] o=new byte[16]; m.doFinal(o,0); return o; }catch(Exception e){ throw new RuntimeException(e); }
+    try{ org.bouncycastle.crypto.digests.Blake2sDigest d=new org.bouncycastle.crypto.digests.Blake2sDigest(16, key); d.update(data,0,data.length); byte[] o=new byte[16]; d.doFinal(o,0); return o; }catch(Exception e){ throw new RuntimeException(e); }
   }
   static void aeadSeal(byte[] out, byte[] key, long counter, byte[] plain, byte[] aad){
     try{
@@ -221,12 +221,6 @@ public class MainActivity extends AppCompatActivity {
   }
 
   boolean probeEndpoint(String ip, int port){ return probeUdp(ip,port); }
-
-  // Fast pre-filter: TCP connect check (if TCP closed, likely UDP closed too — but NOT reliable for WARP)
-  // So we skip TCP filter and go straight to UDP. Just log.
-  boolean probeEndpoint(String ip, int port){
-    return probeUdp(ip, port);
-  }
 
   void startScan() {
     if (pool != null) pool.shutdownNow();
