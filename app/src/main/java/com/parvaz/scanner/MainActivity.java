@@ -126,7 +126,7 @@ public class MainActivity extends AppCompatActivity {
     try{ org.bouncycastle.crypto.macs.HMac m=new org.bouncycastle.crypto.macs.HMac(new org.bouncycastle.crypto.digests.Blake2sDigest(32)); m.init(new KeyParameter(key)); m.update(d1,0,d1.length); m.update(d2,0,d2.length); byte[] o=new byte[32]; m.doFinal(o,0); return o; }catch(Exception e){ throw new RuntimeException(e); }
   }
   static byte[] b2sKeyedMac16(byte[] key, byte[] data){
-    try{ org.bouncycastle.crypto.digests.Blake2sDigest d=new org.bouncycastle.crypto.digests.Blake2sDigest(16, key); d.update(data,0,data.length); byte[] o=new byte[16]; d.doFinal(o,0); return o; }catch(Exception e){ throw new RuntimeException(e); }
+    try{ org.bouncycastle.crypto.digests.Blake2sDigest d=new org.bouncycastle.crypto.digests.Blake2sDigest(key); d.update(data,0,data.length); byte[] full=new byte[32]; d.doFinal(full,0); return java.util.Arrays.copyOf(full,16); }catch(Exception e){ throw new RuntimeException(e); }
   }
   static void aeadSeal(byte[] out, byte[] key, long counter, byte[] plain, byte[] aad){
     try{
