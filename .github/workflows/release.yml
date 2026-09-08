@@ -1,0 +1,18 @@
+name: Release APK
+on:
+  push:
+    tags: ['v*']
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions: { contents: write }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager "platforms;android-34" "build-tools;34.0.0"
+      - run: chmod +x gradlew && ./gradlew assembleDebug --no-daemon
+      - run: cp app/build/outputs/apk/debug/app-debug.apk parvaz-scanner-${{ github.ref_name }}-debug.apk
+      - uses: softprops/action-gh-release@v2
+        with: { files: parvaz-scanner-*-debug.apk }
